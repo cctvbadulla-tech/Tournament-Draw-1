@@ -1,0 +1,597 @@
+<!DOCTYPE html>
+<html lang="si">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Tournament Draw Sheet Generator</title>
+    <style>
+        :root {
+            --bg-color: #f1f5f9;
+            --panel-bg: #ffffff;
+            --primary: #1e293b;
+            --accent: #2563eb;
+            --border: #cbd5e1;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            font-family: 'Calibri', 'Arial', sans-serif;
+            background-color: var(--bg-color);
+            color: #000;
+            display: flex;
+            min-height: 100vh;
+        }
+
+        /* වම් පස පාලක පුවරුව (Control Panel) */
+        .sidebar {
+            width: 380px;
+            background: var(--panel-bg);
+            border-right: 1px solid var(--border);
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            gap: 14px;
+            height: 100vh;
+            overflow-y: auto;
+            position: sticky;
+            top: 0;
+            box-shadow: 2px 0 8px rgba(0,0,0,0.05);
+        }
+
+        .sidebar h2 {
+            font-size: 18px;
+            color: var(--primary);
+            border-bottom: 2px solid var(--accent);
+            padding-bottom: 8px;
+        }
+
+        .form-group {
+            display: flex;
+            flex-direction: column;
+            gap: 5px;
+        }
+
+        .form-group label {
+            font-size: 12px;
+            font-weight: bold;
+            color: #475569;
+        }
+
+        .form-group input, 
+        .form-group textarea {
+            padding: 8px 10px;
+            border: 1px solid var(--border);
+            border-radius: 5px;
+            font-size: 13px;
+            font-family: inherit;
+        }
+
+        .form-group textarea {
+            resize: vertical;
+        }
+
+        .row-2 {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 10px;
+        }
+
+        .btn-group {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 8px;
+            margin-top: 5px;
+        }
+
+        button {
+            padding: 10px 12px;
+            border: none;
+            border-radius: 5px;
+            font-weight: bold;
+            cursor: pointer;
+            font-size: 13px;
+            transition: 0.2s;
+        }
+
+        .btn-primary {
+            background: var(--accent);
+            color: white;
+        }
+
+        .btn-primary:hover {
+            background: #1d4ed8;
+        }
+
+        .btn-secondary {
+            background: #475569;
+            color: white;
+        }
+
+        .btn-secondary:hover {
+            background: #334155;
+        }
+
+        .btn-print {
+            grid-column: span 2;
+            background: #059669;
+            color: white;
+            font-size: 14px;
+            margin-top: 4px;
+        }
+
+        .btn-print:hover {
+            background: #047857;
+        }
+
+        .hint {
+            font-size: 11.5px;
+            color: #64748b;
+            background: #f8fafc;
+            padding: 8px;
+            border-radius: 4px;
+            border-left: 3px solid var(--accent);
+            line-height: 1.4;
+        }
+
+        /* දකුණු පස A4 පිටුව (Preview Area) */
+        .preview-container {
+            flex: 1;
+            padding: 25px;
+            display: flex;
+            justify-content: center;
+            overflow-x: auto;
+        }
+
+        .a4-sheet {
+            background: white;
+            width: 210mm;
+            min-height: 297mm;
+            padding: 16mm 18mm;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.12);
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+        }
+
+        /* ලේඛනයේ ඉහළ කොටස (Header & Notices) */
+        .doc-title {
+            text-align: center;
+            font-size: 14px;
+            font-weight: normal;
+            letter-spacing: 0.4px;
+            margin-bottom: 16px;
+            text-transform: uppercase;
+        }
+
+        .doc-subtitle {
+            font-size: 12px;
+            margin-bottom: 4px;
+            text-transform: uppercase;
+        }
+
+        .doc-notices {
+            font-size: 11px;
+            line-height: 1.45;
+            white-space: pre-line;
+            margin-bottom: 8px;
+            text-transform: uppercase;
+        }
+
+        .doc-section-header {
+            font-size: 12px;
+            font-weight: bold;
+            margin-bottom: 12px;
+            text-transform: uppercase;
+        }
+
+        /* Bracket Canvas Area */
+        #bracket-wrapper {
+            position: relative;
+            width: 100%;
+            margin: 5px 0 15px 0;
+        }
+
+        .player-label {
+            position: absolute;
+            left: 0;
+            font-size: 12px;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            transform: translateY(-50%);
+            padding-right: 8px;
+        }
+
+        .schedule-box {
+            position: absolute;
+            font-size: 11.5px;
+            line-height: 1.25;
+            padding-left: 5px;
+            z-index: 2;
+        }
+
+        .schedule-box div {
+            min-width: 65px;
+            outline: none;
+        }
+
+        [contenteditable="true"]:hover {
+            background-color: rgba(37, 99, 235, 0.08);
+            border-radius: 2px;
+        }
+
+        [contenteditable="true"]:focus {
+            background-color: #fef9c3;
+            outline: 1px dashed var(--accent);
+        }
+
+        /* ලේඛනයේ පහළ අත්සන කොටස (Footer) */
+        .doc-footer {
+            margin-top: 15px;
+            font-size: 12px;
+            line-height: 1.4;
+            white-space: pre-line;
+        }
+
+        /* Print කරන විට පෙනෙන ආකාරය */
+        @media print {
+            @page {
+                size: A4 portrait;
+                margin: 12mm;
+            }
+            body {
+                background: white;
+            }
+            .sidebar {
+                display: none !important;
+            }
+            .preview-container {
+                padding: 0;
+                overflow: visible;
+            }
+            .a4-sheet {
+                width: 100%;
+                min-height: auto;
+                padding: 0;
+                box-shadow: none;
+            }
+            [contenteditable="true"]:hover,
+            [contenteditable="true"]:focus {
+                background: transparent;
+                outline: none;
+            }
+        }
+    </style>
+</head>
+<body>
+
+    <!-- වම් පස පාලක පුවරුව -->
+    <aside class="sidebar">
+        <h2>Tournament Draw සැකසුම්</h2>
+
+        <div class="hint">
+            💡 <b>ඉඟිය:</b> දකුණු පස ඇති Draw Sheet එකේ ඕනෑම <b>වේලාවක්, දිනයක් හෝ නමක්</b> මත Click කර කෙලින්ම වෙනස් කළ හැක.
+        </div>
+
+        <div class="form-group">
+            <label>තරඟාවලියේ නම (Main Title)</label>
+            <input type="text" id="inp-title" value="NATIONAL SNOOKER CHAMPIONSHIPS – 2026" oninput="syncHeader()">
+        </div>
+
+        <div class="form-group">
+            <label>අනු මාතෘකාව (District / Category)</label>
+            <input type="text" id="inp-subtitle" value="NUWARA ELIYA DISTRICT DRAW" oninput="syncHeader()">
+        </div>
+
+        <div class="form-group">
+            <label>නීති රීති සහ දැනුම්දීම් (Notices)</label>
+            <textarea id="inp-notice" rows="5" oninput="syncHeader()">NOTICE:
+1. MATCHES WILL BE PLAYED AT THE TROUT CLUB & NUWARA ELIYA SPORTS CLUB (LAKE CLUB) IN NUWARA ELIYA.
+2. MATCH FORMAT: PRELIMINARY ROUND MATCHES UP TO QUARTER FINALS – BEST OF 3 FRAMES. SEMI FINALS & FINAL WILL BE BEST OF 5 FRAMES.
+3. DRESS CODE – LONG SLEEVED LIGHT COLORED SHIRT, TROUSER, COVERED SHOES, BOWTIE OR A BOW OR A TIE. AT FINALS A WAIST COAT SHOULD BE WORN IN ADDITION TO THE ABOVE.</textarea>
+        </div>
+
+        <div class="form-group">
+            <label>කොටසේ නම (Section Header)</label>
+            <input type="text" id="inp-section" value="BOTTOM HALF – MATCHES WILL BE PLAYED AT TROUT CLUB" oninput="syncHeader()">
+        </div>
+
+        <div class="row-2">
+            <div class="form-group">
+                <label>ආරම්භක අංකය</label>
+                <input type="number" id="inp-start-num" value="15" min="1" onchange="buildDraw(false)">
+            </div>
+            <div class="form-group">
+                <label>පේළි පරතරය (px)</label>
+                <input type="number" id="inp-spacing" value="38" min="24" max="65" onchange="buildDraw(false)">
+            </div>
+        </div>
+
+        <div class="form-group">
+            <label>ක්‍රීඩකයින්ගේ ලැයිස්තුව (එක් පේළියකට එක් නමක්)</label>
+            <textarea id="inp-players" rows="11">Anuruddha Perera (NESC)
+Tharindu Thivanka (QBC)
+S. Dinesh (NESC)
+Erandha Keertiratne (TC)
+M. Husair (QBC)
+Ruwan Fernando (NESC)
+Sreenath Jayasinghe (QBC)
+S. M. Shiyamdeen (QBC)
+Chaminda Sampath (TC)
+Rupa Chandra (QBC)
+Janaka Abeysinghe (NESC)
+Diluksha Keerthiratne (TC)
+Asanka (QBC)
+B. M. S. Bandara (QBC)
+R. Gunasekera (NESC)</textarea>
+        </div>
+
+        <div class="btn-group">
+            <button class="btn-primary" onclick="buildDraw(false)">පිළිවෙලට හදන්න</button>
+            <button class="btn-secondary" onclick="buildDraw(true)">කලවම් කර හදන්න</button>
+            <button class="btn-print" onclick="window.print()">🖨️ Print / Save PDF</button>
+        </div>
+
+        <div class="form-group" style="margin-top: 8px;">
+            <label>අත්සන සහ දිනය (Footer)</label>
+            <textarea id="inp-footer" rows="4" oninput="syncHeader()">S. M. Ibrahim
+Tournament Secretary
+B&SASL
+1/11/2026</textarea>
+        </div>
+    </aside>
+
+    <!-- දකුණු පස A4 Draw Sheet පෙනුම -->
+    <main class="preview-container">
+        <div class="a4-sheet">
+            <div>
+                <div class="doc-title" id="out-title" contenteditable="true"></div>
+                <div class="doc-subtitle" id="out-subtitle" contenteditable="true"></div>
+                <div class="doc-notices" id="out-notice" contenteditable="true"></div>
+                <div class="doc-section-header" id="out-section" contenteditable="true"></div>
+
+                <!-- Bracket එක ඇඳෙන ස්ථානය -->
+                <div id="bracket-wrapper"></div>
+            </div>
+
+            <div class="doc-footer" id="out-footer" contenteditable="true"></div>
+        </div>
+    </main>
+
+    <script>
+        // ඔබ එවූ ඡායාරූපයේ තිබූ දින සහ වේලාවන් පෙරනිමියෙන් (Default)
+        const photoDefaultSchedules = {
+            "0-1": { time: "4PM", date: "11/5/2026" },
+            "0-2": { time: "10AM", date: "11/6/2026" },
+            "0-3": { time: "12NOON", date: "11/6/2026" },
+            "0-4": { time: "2PM", date: "11/6/2026" },
+            "0-5": { time: "4PM", date: "11/6/2026" },
+            "0-6": { time: "10AM", date: "11/7/2026" },
+            "0-7": { time: "12NOON", date: "11/7/2026" },
+            "1-0": { time: "2PM", date: "11/8/2026" },
+            "1-1": { time: "4PM", date: "11/8/2026" },
+            "1-2": { time: "10PM", date: "11/9/2026" },
+            "1-3": { time: "12NOON", date: "9/11/2026" },
+            "2-0": { time: "10AM", date: "10/11/2026" },
+            "2-1": { time: "12NOON", date: "10/11/2026" },
+            "3-0": { time: "4PM", date: "11/10/2026" }
+        };
+
+        // පරිශීලකයා වෙනස් කරන දින/වේලාවන් මතක තබා ගැනීමට
+        let customSchedules = { ...photoDefaultSchedules };
+
+        function syncHeader() {
+            document.getElementById('out-title').innerText = document.getElementById('inp-title').value;
+            document.getElementById('out-subtitle').innerText = document.getElementById('inp-subtitle').value;
+            document.getElementById('out-notice').innerText = document.getElementById('inp-notice').value;
+            document.getElementById('out-section').innerText = document.getElementById('inp-section').value;
+            document.getElementById('out-footer').innerText = document.getElementById('inp-footer').value;
+        }
+
+        // ක්‍රීඩකයින් ගණන අනුව Bracket ගස (Tree) ගොඩනැගීම (ඉහළ ක්‍රීඩකයින්ට ප්‍රමුඛතා Bye ලැබෙන ලෙස)
+        function createSlotList(players) {
+            const n = players.length;
+            if (n === 0) return [];
+            const p = Math.pow(2, Math.ceil(Math.log2(Math.max(2, n))));
+            const byes = p - n;
+
+            let items = [];
+            let idx = 0;
+
+            for (let i = 0; i < byes; i++) {
+                items.push({ type: 'BYE_PLAYER', name: players[idx++] });
+            }
+            while (idx < n) {
+                items.push({ type: 'NORMAL_PLAYER', name: players[idx++] });
+            }
+            return items;
+        }
+
+        function buildDraw(shuffle = false) {
+            const rawLines = document.getElementById('inp-players').value
+                .split('\n')
+                .map(s => s.trim())
+                .filter(s => s.length > 0);
+
+            if (rawLines.length < 2) {
+                alert("කරුණාකර අවම වශයෙන් ක්‍රීඩකයින් දෙදෙනෙකුගේ නම් ඇතුළත් කරන්න.");
+                return;
+            }
+
+            let players = [...rawLines];
+            if (shuffle) {
+                for (let i = players.length - 1; i > 0; i--) {
+                    const j = Math.floor(Math.random() * (i + 1));
+                    [players[i], players[j]] = [players[j], players[i]];
+                }
+                document.getElementById('inp-players').value = players.join('\n');
+            }
+
+            const startNum = parseInt(document.getElementById('inp-start-num').value) || 1;
+            const rowStep = parseInt(document.getElementById('inp-spacing').value) || 38;
+
+            const n = players.length;
+            const bracketSize = Math.pow(2, Math.ceil(Math.log2(Math.max(2, n))));
+            const totalRounds = Math.log2(bracketSize);
+            const numByes = bracketSize - n;
+
+            // SVG සහ කොටස් වල පළල සැකසීම
+            const nameColumnWidth = 225;
+            const round1StartX = 230;
+            const roundWidth = 92;
+            const finalStubWidth = 55;
+            const totalHeight = (n - 1) * rowStep + 40;
+            const totalWidth = round1StartX + (totalRounds * roundWidth) + finalStubWidth;
+
+            const wrapper = document.getElementById('bracket-wrapper');
+            wrapper.innerHTML = '';
+            wrapper.style.height = totalHeight + 'px';
+
+            const svgNS = "http://www.w3.org/2000/svg";
+            const svg = document.createElementNS(svgNS, "svg");
+            svg.setAttribute("width", "100%");
+            svg.setAttribute("height", totalHeight);
+            svg.setAttribute("viewBox", `0 0 ${totalWidth} ${totalHeight}`);
+            svg.style.position = "absolute";
+            svg.style.left = "0";
+            svg.style.top = "0";
+            svg.style.overflow = "visible";
+
+            function addLine(x1, y1, x2, y2) {
+                const line = document.createElementNS(svgNS, "line");
+                line.setAttribute("x1", x1);
+                line.setAttribute("y1", y1);
+                line.setAttribute("x2", x2);
+                line.setAttribute("y2", y2);
+                line.setAttribute("stroke", "#000000");
+                line.setAttribute("stroke-width", "1.1");
+                svg.appendChild(line);
+            }
+
+            // ක්‍රීඩකයින්ගේ නම් සහ Y-අගයන් පිහිටුවීම
+            let playerY = [];
+            for (let i = 0; i < n; i++) {
+                const y = 18 + (i * rowStep);
+                playerY.push(y);
+
+                const pDiv = document.createElement('div');
+                pDiv.className = 'player-label';
+                pDiv.style.top = y + 'px';
+                pDiv.style.width = nameColumnWidth + 'px';
+                pDiv.contentEditable = "true";
+                pDiv.innerText = `${startNum + i}. ${players[i]}`;
+                wrapper.appendChild(pDiv);
+            }
+
+            // පළමු වටයේ (Round 0) තරඟ හෝ Bye සැකසීම
+            let currentRoundOutputs = [];
+            let pIndex = 0;
+            const totalR1Matches = bracketSize / 2;
+
+            for (let m = 0; m < totalR1Matches; m++) {
+                const xLeft = round1StartX;
+                const xRight = round1StartX + roundWidth;
+
+                if (m < numByes) {
+                    // මෙම ක්‍රීඩකයාට Bye එකක් හිමිවේ (කෙලින්ම 2 වන වටයට)
+                    const y = playerY[pIndex++];
+                    currentRoundOutputs.push({
+                        xStart: xLeft + 35, // ඡායාරූපයේ 15 වන ක්‍රීඩකයාගේ ඉර මෙන්
+                        y: y
+                    });
+                } else {
+                    // සාමාන්‍ය පළමු වටයේ තරඟයක්
+                    const y1 = playerY[pIndex++];
+                    const y2 = playerY[pIndex++];
+                    const yMid = (y1 + y2) / 2;
+
+                    // තිරස් ඉරි දෙක සහ සිරස් ඉර
+                    addLine(xLeft, y1, xRight, y1);
+                    addLine(xLeft, y2, xRight, y2);
+                    addLine(xRight, y1, xRight, y2);
+
+                    // දිනය සහ වේලාව ඇතුළත් කිරීම
+                    createScheduleLabel(wrapper, 0, m, xRight, yMid);
+
+                    currentRoundOutputs.push({
+                        xStart: xRight,
+                        y: yMid
+                    });
+                }
+            }
+
+            // 2 වන වටයේ සිට අවසන් වටය දක්වා (Subsequent Rounds)
+            for (let r = 1; r < totalRounds; r++) {
+                let nextRoundOutputs = [];
+                const xRight = round1StartX + ((r + 1) * roundWidth);
+                const matchesInRound = currentRoundOutputs.length / 2;
+
+                for (let m = 0; m < matchesInRound; m++) {
+                    const topIn = currentRoundOutputs[m * 2];
+                    const botIn = currentRoundOutputs[m * 2 + 1];
+                    const yMid = (topIn.y + botIn.y) / 2;
+
+                    addLine(topIn.xStart, topIn.y, xRight, topIn.y);
+                    addLine(botIn.xStart, botIn.y, xRight, botIn.y);
+                    addLine(xRight, topIn.y, xRight, botIn.y);
+
+                    createScheduleLabel(wrapper, r, m, xRight, yMid);
+
+                    nextRoundOutputs.push({
+                        xStart: xRight,
+                        y: yMid
+                    });
+                }
+                currentRoundOutputs = nextRoundOutputs;
+            }
+
+            // අවසාන ජයග්‍රාහකයාගේ තිරස් ඉර සහ වේලාව
+            if (currentRoundOutputs.length === 1) {
+                const finalOut = currentRoundOutputs[0];
+                addLine(finalOut.xStart, finalOut.y, finalOut.xStart + finalStubWidth, finalOut.y);
+            }
+
+            wrapper.appendChild(svg);
+        }
+
+        function createScheduleLabel(wrapper, roundIdx, matchIdx, xPos, yMid) {
+            const key = `${roundIdx}-${matchIdx}`;
+            const saved = customSchedules[key] || { time: "4PM", date: "11/6/2026" };
+
+            const box = document.createElement('div');
+            box.className = 'schedule-box';
+            box.style.left = (xPos + 3) + 'px';
+            box.style.top = (yMid - 15) + 'px';
+
+            const timeEl = document.createElement('div');
+            timeEl.contentEditable = "true";
+            timeEl.innerText = saved.time;
+            timeEl.oninput = () => {
+                customSchedules[key] = { ...customSchedules[key], time: timeEl.innerText };
+            };
+
+            const dateEl = document.createElement('div');
+            dateEl.contentEditable = "true";
+            dateEl.innerText = saved.date;
+            dateEl.oninput = () => {
+                customSchedules[key] = { ...customSchedules[key], date: dateEl.innerText };
+            };
+
+            box.appendChild(timeEl);
+            box.appendChild(dateEl);
+            wrapper.appendChild(box);
+        }
+
+        // ආරම්භයේදීම ක්‍රියාත්මක කිරීම
+        window.onload = () => {
+            syncHeader();
+            buildDraw(false);
+        };
+    </script>
+</body>
+</html>
